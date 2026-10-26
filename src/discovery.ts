@@ -52,3 +52,13 @@ export function resolvePanelHost(cfg: PanelConfig, found: readonly DiscoveredDev
 export function isUnconfigured(dev: DiscoveredDevice, panels: readonly PanelConfig[]): boolean {
   return !panels.some(p => p.mac === dev.mac || p.host === dev.host);
 }
+
+/**
+ * The new address of a panel configured by MAC only, when discovery reports it somewhere other than `currentHost`.
+ */
+export function movedHost(cfg: PanelConfig, currentHost: string, dev: DiscoveredDevice): string | undefined {
+  if (cfg.host || !cfg.mac || cfg.mac !== dev.mac || dev.host === currentHost) {
+    return undefined;
+  }
+  return dev.host;
+}

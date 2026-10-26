@@ -6,9 +6,10 @@ import { accessoryUuid, staleAccessories } from './accessoryIds.ts';
 import type { AccessoryContext } from './accessoryIds.ts';
 import { normalizeConfig, panelLabel } from './config.ts';
 import type { PanelConfig, PluginConfig } from './config.ts';
-import { isUnconfigured, MDNS_TYPES, parseService, resolvePanelHost } from './discovery.ts';
+import { isUnconfigured, MDNS_TYPES, movedHost, parseService, resolvePanelHost } from './discovery.ts';
 import type { DiscoveredDevice } from './discovery.ts';
 import { PanelConnection } from './panelConnection.ts';
+import type { PanelLink } from './panelLink.ts';
 import { SecuritySystemHandler } from './securitySystem.ts';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.ts';
 import { ZoneSensorHandler } from './zoneSensor.ts';
@@ -18,6 +19,9 @@ interface PanelRuntime {
   cfg: PanelConfig;
   label: string;
   conn?: PanelConnection;
+  host?: string;
+  // Stable link for accessory handlers; follows rt.conn when the connection is replaced (e.g. the panel moved address).
+  link: PanelLink;
   security: Map<string, SecuritySystemHandler>;
   zones: Map<string, ZoneSensorHandler>;
 }
@@ -39,7 +43,23 @@ export class KonnectedStandalonePlatform implements DynamicPlatformPlugin {
     this.log = log;
     this.api = api;
     this.config = normalizeConfig(config, log);
-    this.panels = this.config.panels.map(cfg => ({ cfg, label: panelLabel(cfg), security: new Map(), zones: new Map() }));
+    this.panels = this.config.panels.map(cfg => {
+      const rt: PanelRuntime = {
+        cfg,
+        label: panelLabel(cfg),
+        security: new Map(),
+        zones: new Map(),
+        link: {
+          get connected() {
+            return rt.conn?.connected ?? false;
+          },
+          sendAlarmCommand: (...args) => rt.conn
+            ? rt.conn.sendAlarmCommand(...args)
+            : Promise.reject(new Error(`Panel "${rt.label}" is not connected.`)),
+        },
+      };
+      return rt;
+    });
     if (this.panels.length === 0) {
       this.log.warn('No panels configured. Add your Konnected panel under "panels" in the plugin settings.');
     }
@@ -80,6 +100,14 @@ export class KonnectedStandalonePlatform implements DynamicPlatformPlugin {
     for (const rt of this.panels) {
       if (!rt.conn && rt.cfg.mac === dev.mac) {
         this.startPanel(rt, dev.host);
+        continue;
+      }
+      const newHost = rt.conn && rt.host ? movedHost(rt.cfg, rt.host, dev) : undefined;
+      if (rt.conn && newHost) {
+        this.log.info(`Panel "${rt.label}" moved from ${rt.host} to ${newHost}; reconnecting.`);
+        const old = rt.conn;
+        rt.conn = undefined;
+        void old.stop().then(() => this.startPanel(rt, newHost));
       }
     }
     if (isUnconfigured(dev, this.config.panels) && !this.reported.has(dev.mac)) {
@@ -94,6 +122,7 @@ export class KonnectedStandalonePlatform implements DynamicPlatformPlugin {
   }
 
   private startPanel(rt: PanelRuntime, host: string): void {
+    rt.host = host;
     rt.conn = new PanelConnection(rt.cfg, host, {
       onEntities: (mac, entities) => this.onEntities(rt, mac, entities),
       onAlarmState: (objectId, state) => this.onAlarmState(rt, objectId, state),
@@ -139,7 +168,7 @@ export class KonnectedStandalonePlatform implements DynamicPlatformPlugin {
       live.add(accessory.UUID);
       let handler = rt.security.get(entity.objectId);
       if (!handler) {
-        handler = new SecuritySystemHandler(accessory, this.api.hap, rt.conn!, this.log,
+        handler = new SecuritySystemHandler(accessory, this.api.hap, rt.link, this.log,
           { code: rt.cfg.code, commandTimeoutMs: this.config.commandTimeoutMs });
         rt.security.set(entity.objectId, handler);
       }

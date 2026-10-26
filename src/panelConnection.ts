@@ -25,10 +25,6 @@ const defaultFactory: ClientFactory = opts => new EspHomeClient(opts);
 const RETRY_INITIAL_MS = 5_000;
 const RETRY_MAX_MS = 60_000;
 
-function objectIdOf(entity: string, type: string): string {
-  return entity.startsWith(`${type}-`) ? entity.slice(type.length + 1) : entity;
-}
-
 /**
  * One long-lived ESPHome native API connection to a panel. Auto-reconnect after a drop is esphome-client's job; this class only
  * retries the very first connect, which the library does not supervise.
@@ -45,6 +41,9 @@ export class PanelConnection implements PanelLink {
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
   private retryDelayMs = RETRY_INITIAL_MS;
   private stopped = false;
+  private refused = false;
+  // State events identify the entity by numeric key (their `entity` field is the friendly name); rebuilt on every entity listing.
+  private objectIdByKey = new Map<number, string>();
 
   constructor(cfg: PanelConfig, host: string, events: PanelEvents, log: Logging, factory: ClientFactory = defaultFactory) {
     this.cfg = cfg;
@@ -57,7 +56,7 @@ export class PanelConnection implements PanelLink {
   }
 
   get connected(): boolean {
-    return this.isConnected;
+    return this.isConnected && !this.refused;
   }
 
   get mac(): string | undefined {
@@ -86,6 +85,9 @@ export class PanelConnection implements PanelLink {
 
   sendAlarmCommand(objectId: string, command: AlarmControlPanelCommand, code: string | undefined,
     confirm: (s: AlarmControlPanelState) => boolean, timeoutMs: number): Promise<AlarmControlPanelState> {
+    if (!this.connected) {
+      return Promise.reject(new Error(`Panel "${this.label}" is not connected.`));
+    }
     const options = code === undefined ? { command } : { command, code };
     return this.client.commandAndAwait(entityId('alarm_control_panel', objectId), options, {
       predicate: event => event.state !== undefined && confirm(event.state),
@@ -94,7 +96,7 @@ export class PanelConnection implements PanelLink {
   }
 
   private subscribe(): void {
-    this.client.on('connect', () => this.setConnected(true));
+    this.client.on('connect', encrypted => this.onConnect(encrypted));
     this.client.on('disconnect', () => this.setConnected(false));
     this.client.on('deviceInfo', info => {
       if (info.macAddress) {
@@ -102,20 +104,38 @@ export class PanelConnection implements PanelLink {
       }
     });
     this.client.on('entities', entities => {
+      this.objectIdByKey = new Map(entities.map(e => [e.key, e.objectId]));
       this.events.onEntities(this.deviceMac ?? this.cfg.mac ?? '', entities);
     });
     this.client.on('alarm_control_panel', event => {
-      if (event.state !== undefined) {
-        this.events.onAlarmState(objectIdOf(event.entity, 'alarm_control_panel'), event.state);
+      const objectId = this.objectIdByKey.get(event.key);
+      if (objectId !== undefined && event.state !== undefined) {
+        this.events.onAlarmState(objectId, event.state);
       }
     });
     this.client.on('binary_sensor', event => {
-      this.events.onZoneState(objectIdOf(event.entity, 'binary_sensor'), event.state === true, event.missingState === true);
+      const objectId = this.objectIdByKey.get(event.key);
+      if (objectId !== undefined) {
+        this.events.onZoneState(objectId, event.state === true, event.missingState === true);
+      }
     });
   }
 
+  private onConnect(encrypted: boolean): void {
+    // esphome-client falls back to plaintext when the peer does not speak Noise. With a key configured that is either a misconfigured
+    // panel or someone impersonating it, so never accept it.
+    if (this.cfg.encryptionKey && !encrypted) {
+      this.refused = true;
+      this.log.error(`Panel "${this.label}" answered unencrypted although an encryption key is configured. Refusing the connection; `
+        + 'check the panel\'s api: encryption: setting. Restart Homebridge after fixing it.');
+      void this.client.disconnectAsync().catch(() => undefined);
+      return;
+    }
+    this.setConnected(true);
+  }
+
   private setConnected(connected: boolean): void {
-    if (connected === this.isConnected) {
+    if (this.refused || connected === this.isConnected) {
       return;
     }
     this.isConnected = connected;

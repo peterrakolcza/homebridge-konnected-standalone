@@ -46,13 +46,15 @@ function panelEntity(overrides: Partial<AlarmControlPanelEntity> = {}): AlarmCon
   }) as AlarmControlPanelEntity;
 }
 
-function setup(opts: { code?: string; entity?: AlarmControlPanelEntity } = {}) {
+function setup(opts: { code?: string; entity?: AlarmControlPanelEntity; initialState?: AlarmControlPanelState | null } = {}) {
   const accessory = createFakeAccessory('House Alarm', 'uuid-1');
   const link = new FakeLink();
   const log = createFakeLog();
   const handler = new SecuritySystemHandler(accessory, hap, link, log, { code: opts.code, commandTimeoutMs: 10_000 });
   handler.configure(opts.entity ?? panelEntity());
-  handler.applyState(S.DISARMED);
+  if (opts.initialState !== null) {
+    handler.applyState(opts.initialState ?? S.DISARMED);
+  }
   const service = accessory.getService(hap.Service.SecuritySystem)!;
   const current = service.getCharacteristic(hap.Characteristic.SecuritySystemCurrentState);
   const target = service.getCharacteristic(hap.Characteristic.SecuritySystemTargetState);
@@ -150,10 +152,45 @@ test('requires code with none configured warns once at configure', () => {
   assert.equal(log.lines.filter(l => l.level === 'warn').length, 1);
 });
 
-test('setFault toggles StatusFault', () => {
+test('fault clears only after a fresh panel state following reconnect', () => {
   const { handler, fault } = setup();
+  assert.equal(fault.value, hap.Characteristic.StatusFault.NO_FAULT);
   handler.setFault(true);
   assert.equal(fault.value, hap.Characteristic.StatusFault.GENERAL_FAULT);
   handler.setFault(false);
+  assert.equal(fault.value, hap.Characteristic.StatusFault.GENERAL_FAULT);
+  handler.applyState(S.DISARMED);
   assert.equal(fault.value, hap.Characteristic.StatusFault.NO_FAULT);
+});
+
+test('no armed state or healthy tile before the panel reports', () => {
+  const { handler, fault, current, target } = setup({ initialState: null });
+  assert.equal(current.value, HkCurrent.DISARMED);
+  assert.equal(target.value, HkTarget.DISARM);
+  assert.equal(fault.value, hap.Characteristic.StatusFault.GENERAL_FAULT);
+  handler.setFault(false);
+  assert.equal(fault.value, hap.Characteristic.StatusFault.GENERAL_FAULT);
+  handler.applyState(S.ARMED_AWAY);
+  assert.equal(fault.value, hap.Characteristic.StatusFault.NO_FAULT);
+});
+
+test('revert during exit delay keeps the arming target', async () => {
+  const { handler, link, target } = setup();
+  await target.handleSetRequest(HkTarget.AWAY_ARM);
+  handler.applyState(S.ARMING);
+  link.calls[0].resolve(S.ARMING);
+  await tick();
+  await target.handleSetRequest(HkTarget.STAY_ARM);
+  link.calls[1].reject(timeoutError());
+  await tick();
+  assert.equal(target.value, HkTarget.AWAY_ARM);
+});
+
+test('superseding arm request is not confirmed by ARMING', async () => {
+  const { link, target } = setup();
+  await target.handleSetRequest(HkTarget.AWAY_ARM);
+  await target.handleSetRequest(HkTarget.STAY_ARM);
+  assert.equal(link.calls[0].confirm(S.ARMING), true);
+  assert.equal(link.calls[1].confirm(S.ARMING), false);
+  assert.equal(link.calls[1].confirm(S.ARMED_HOME), true);
 });

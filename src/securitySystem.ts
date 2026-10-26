@@ -68,7 +68,11 @@ export class SecuritySystemHandler {
   private lastState: AlarmControlPanelState | undefined;
   private requested: HkTarget | null = null;
   private requestSeq = 0;
+  private pendingArms = 0;
   private warnedMissingCode = false;
+  private connectionFault = false;
+  // True until the panel has reported a state since the last (re)connect, so HomeKit never shows an unreported state as healthy.
+  private awaitingState = true;
 
   constructor(accessory: PlatformAccessory, hap: HAP, link: PanelLink, log: Logging, opts: SecuritySystemOptions) {
     this.accessory = accessory;
@@ -80,6 +84,8 @@ export class SecuritySystemHandler {
     this.service = accessory.getService(Service.SecuritySystem) ?? accessory.addService(Service.SecuritySystem, accessory.displayName);
     this.service.getCharacteristic(Characteristic.SecuritySystemTargetState).onSet(value => this.handleTargetSet(value));
     this.service.getCharacteristic(Characteristic.StatusFault);
+    this.publish();
+    this.publishFault();
   }
 
   configure(entity: AlarmControlPanelEntity): void {
@@ -101,12 +107,22 @@ export class SecuritySystemHandler {
       this.lastState = state;
       this.log.info(`${this.name}: ${STATE_LABEL[state]}`);
     }
+    this.awaitingState = false;
     this.publish();
+    this.publishFault();
   }
 
   setFault(fault: boolean): void {
+    this.connectionFault = fault;
+    if (fault) {
+      this.awaitingState = true;
+    }
+    this.publishFault();
+  }
+
+  private publishFault(): void {
     const { StatusFault } = this.hap.Characteristic;
-    this.service.updateCharacteristic(StatusFault, fault ? StatusFault.GENERAL_FAULT : StatusFault.NO_FAULT);
+    this.service.updateCharacteristic(StatusFault, this.connectionFault || this.awaitingState ? StatusFault.GENERAL_FAULT : StatusFault.NO_FAULT);
   }
 
   private get name(): string {
@@ -134,8 +150,21 @@ export class SecuritySystemHandler {
     const label = TARGET_LABEL[target];
     this.log.info(`${this.name}: ${label} requested from Home.`);
 
-    this.link.sendAlarmCommand(this.entity.objectId, commandForTarget(target), this.codeFor(target),
-      s => confirmsRequest(target, s), this.opts.commandTimeoutMs)
+    // While an earlier arm request is still in flight, ARMING may belong to it, so it cannot confirm this one.
+    const supersedesArm = this.pendingArms > 0;
+    const isArm = target !== HkTarget.DISARM;
+    if (isArm) {
+      this.pendingArms++;
+    }
+    const confirm = (s: AlarmControlPanelState) =>
+      supersedesArm && s === AlarmControlPanelState.ARMING ? false : confirmsRequest(target, s);
+
+    this.link.sendAlarmCommand(this.entity.objectId, commandForTarget(target), this.codeFor(target), confirm, this.opts.commandTimeoutMs)
+      .finally(() => {
+        if (isArm) {
+          this.pendingArms--;
+        }
+      })
       .then(() => {
         if (seq === this.requestSeq) {
           this.log.info(`${this.name}: panel confirmed ${label}.`);
@@ -146,7 +175,10 @@ export class SecuritySystemHandler {
           return;
         }
         this.requested = null;
-        this.mapped = { ...this.mapped, target: targetForCurrent(this.mapped) };
+        // Re-derive from what the panel last reported, so a revert during an exit delay keeps the arming target.
+        this.mapped = this.lastState !== undefined
+          ? mapPanelState(this.lastState, this.mapped, null)
+          : { ...this.mapped, target: targetForCurrent(this.mapped) };
         this.log.warn(`${this.name}: panel did not confirm ${label} within ${this.opts.commandTimeoutMs / 1000} s; reverting.`);
         this.publish();
       });

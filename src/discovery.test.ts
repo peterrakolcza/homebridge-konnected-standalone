@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import type { Service } from 'bonjour-service';
 
 import type { PanelConfig } from './config.ts';
-import { isUnconfigured, parseService, resolvePanelHost } from './discovery.ts';
+import { isUnconfigured, movedHost, parseService, resolvePanelHost } from './discovery.ts';
 import type { DiscoveredDevice } from './discovery.ts';
 
 function svc(fields: Partial<Service>): Service {
@@ -48,4 +48,12 @@ test('isUnconfigured by mac or host', () => {
   assert.equal(isUnconfigured(found[0], [panel({ host: '192.168.1.44' })]), false);
   assert.equal(isUnconfigured(found[0], [panel({ host: 'konnected-6f67c3.local' })]), true);
   assert.equal(isUnconfigured(found[0], []), true);
+});
+
+test('movedHost follows a mac-only panel to its new address', () => {
+  const moved = { ...found[0], host: '192.168.1.77' };
+  assert.equal(movedHost(panel({ mac: 'f4:cf:a2:6f:67:c3' }), '192.168.1.44', moved), '192.168.1.77');
+  assert.equal(movedHost(panel({ mac: 'f4:cf:a2:6f:67:c3' }), '192.168.1.44', found[0]), undefined);
+  assert.equal(movedHost(panel({ host: '192.168.1.44', mac: 'f4:cf:a2:6f:67:c3' }), '192.168.1.44', moved), undefined);
+  assert.equal(movedHost(panel({ mac: 'aa:bb:cc:dd:ee:ff' }), '192.168.1.44', moved), undefined);
 });
