@@ -39,11 +39,11 @@ test('panel without host or mac is dropped with an error', () => {
 });
 
 test('mac normalised', () => {
-  assert.equal(normalizeMac('F4-CF-A2-6F-67-C3'), 'f4:cf:a2:6f:67:c3');
-  assert.equal(normalizeMac('f4cfa26f67c3'), 'f4:cf:a2:6f:67:c3');
-  assert.equal(normalizeMac('F4:CF:A2:6F:67:C3'), 'f4:cf:a2:6f:67:c3');
-  const c = normalizeConfig({ panels: [{ mac: 'F4CFA26F67C3' }] }, fakeLog());
-  assert.equal(c.panels[0].mac, 'f4:cf:a2:6f:67:c3');
+  assert.equal(normalizeMac('A4-CF-12-34-56-78'), 'a4:cf:12:34:56:78');
+  assert.equal(normalizeMac('a4cf12345678'), 'a4:cf:12:34:56:78');
+  assert.equal(normalizeMac('A4:CF:12:34:56:78'), 'a4:cf:12:34:56:78');
+  const c = normalizeConfig({ panels: [{ mac: 'A4CF12345678' }] }, fakeLog());
+  assert.equal(c.panels[0].mac, 'a4:cf:12:34:56:78');
 });
 
 test('invalid mac drops the panel when there is no host', () => {

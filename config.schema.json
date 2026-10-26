@@ -33,14 +33,14 @@
               "title": "Host or IP address",
               "type": "string",
               "description": "Either host or MAC address is required.",
-              "placeholder": "192.168.1.44"
+              "placeholder": "192.168.1.50"
             },
             "mac": {
               "title": "MAC address",
               "type": "string",
               "description": "Used to find the panel on the network when no host is given.",
               "pattern": "^([0-9A-Fa-f]{2}[:-]?){5}[0-9A-Fa-f]{2}$",
-              "placeholder": "f4:cf:a2:6f:67:c3"
+              "placeholder": "a4:cf:12:34:56:78"
             },
             "port": {
               "title": "Port",

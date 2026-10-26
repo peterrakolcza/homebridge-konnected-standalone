@@ -48,7 +48,7 @@ Zones are discovered from the panel automatically, so you only need overrides to
   "panels": [
     {
       "name": "House alarm",
-      "host": "192.168.1.44",
+      "host": "192.168.1.50",
       "encryptionKey": "<32-byte base64 key from the panel's ESPHome config>",
       "code": "1234",
       "zones": [
