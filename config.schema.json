@@ -7,7 +7,9 @@
   "footerDisplay": "Legacy Konnected 3.x firmware is not supported; use homebridge-konnected for that.",
   "schema": {
     "type": "object",
-    "required": ["name"],
+    "required": [
+      "name"
+    ],
     "additionalProperties": false,
     "properties": {
       "name": {
@@ -25,25 +27,26 @@
             "name": {
               "title": "Name",
               "type": "string",
-              "description": "Optional. Defaults to the panel's ESPHome friendly name."
+              "description": "Optional. Defaults to the name of the panel's alarm entity."
             },
             "host": {
               "title": "Host or IP address",
               "type": "string",
-              "description": "Either host or MAC address is required."
+              "description": "Either host or MAC address is required.",
+              "placeholder": "192.168.1.44"
             },
             "mac": {
               "title": "MAC address",
               "type": "string",
               "description": "Used to find the panel on the network when no host is given.",
-              "pattern": "^([0-9A-Fa-f]{2}[:-]?){5}[0-9A-Fa-f]{2}$"
+              "pattern": "^([0-9A-Fa-f]{2}[:-]?){5}[0-9A-Fa-f]{2}$",
+              "placeholder": "f4:cf:a2:6f:67:c3"
             },
             "port": {
               "title": "Port",
               "type": "integer",
               "default": 6053,
-              "minimum": 1,
-              "maximum": 65535
+              "placeholder": 6053
             },
             "encryptionKey": {
               "title": "API encryption key",
@@ -61,7 +64,9 @@
               "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["id"],
+                "required": [
+                  "id"
+                ],
                 "properties": {
                   "id": {
                     "title": "Zone name or object ID",
@@ -72,8 +77,18 @@
                     "type": "string",
                     "default": "motion",
                     "oneOf": [
-                      { "title": "Motion sensor", "enum": ["motion"] },
-                      { "title": "Contact sensor", "enum": ["contact"] }
+                      {
+                        "title": "Motion sensor",
+                        "enum": [
+                          "motion"
+                        ]
+                      },
+                      {
+                        "title": "Contact sensor",
+                        "enum": [
+                          "contact"
+                        ]
+                      }
                     ]
                   },
                   "hidden": {
@@ -91,8 +106,7 @@
         "title": "Command timeout (seconds)",
         "type": "integer",
         "default": 10,
-        "minimum": 2,
-        "description": "How long to wait for the panel to confirm an arm/disarm before Home reverts."
+        "description": "How long to wait for the panel to confirm an arm/disarm before Home reverts. At least 2."
       },
       "discovery": {
         "title": "Find panels on the network (mDNS)",
@@ -119,13 +133,23 @@
             "panels[].host",
             "panels[].mac",
             "panels[].port",
-            { "key": "panels[].encryptionKey", "type": "password" },
-            { "key": "panels[].code", "type": "password" },
+            {
+              "key": "panels[].encryptionKey",
+              "type": "password"
+            },
+            {
+              "key": "panels[].code",
+              "type": "password"
+            },
             {
               "key": "panels[].zones",
               "type": "array",
               "buttonText": "Add zone override",
-              "items": ["panels[].zones[].id", "panels[].zones[].type", "panels[].zones[].hidden"]
+              "items": [
+                "panels[].zones[].id",
+                "panels[].zones[].type",
+                "panels[].zones[].hidden"
+              ]
             }
           ]
         }
@@ -136,7 +160,10 @@
       "title": "Advanced",
       "expandable": true,
       "expanded": false,
-      "items": ["commandTimeout", "discovery"]
+      "items": [
+        "commandTimeout",
+        "discovery"
+      ]
     }
   ]
 }
