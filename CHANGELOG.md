@@ -1,0 +1,9 @@
+# Changelog
+
+## 0.1.0
+
+- First release.
+- One Security System accessory per Konnected panel running ESPHome standalone alarm mode, over the encrypted ESPHome native API.
+- One live sensor per zone (motion by default, contact per zone).
+- Confirm-or-revert for arm/disarm requests, "No Response" when the panel is offline, fault indication on disconnect.
+- Optional mDNS discovery that only locates configured panels.
