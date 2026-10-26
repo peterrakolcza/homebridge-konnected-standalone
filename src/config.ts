@@ -100,6 +100,13 @@ function normalizePanel(raw: unknown, index: number, log: ConfigLog): PanelConfi
     log.warn(`Panel "${label}": "mac" is not a valid MAC address and will be ignored.`);
   }
 
+  // esphome-client silently drops a malformed key and connects in plaintext; refuse the panel instead.
+  const encryptionKey = str(p.encryptionKey);
+  if (encryptionKey !== undefined && Buffer.from(encryptionKey, 'base64').length !== 32) {
+    log.error(`Panel "${label}": "encryptionKey" must be the 32-byte base64 key from the panel's ESPHome config; the panel will be ignored.`);
+    return undefined;
+  }
+
   let port = DEFAULT_PORT;
   if (p.port !== undefined) {
     if (Number.isInteger(p.port) && (p.port as number) > 0 && (p.port as number) < 65536) {
@@ -114,7 +121,7 @@ function normalizePanel(raw: unknown, index: number, log: ConfigLog): PanelConfi
     host,
     mac,
     port,
-    encryptionKey: str(p.encryptionKey),
+    encryptionKey,
     code: str(p.code),
     zones: normalizeZones(p.zones, label, log),
   };

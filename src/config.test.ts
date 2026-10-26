@@ -78,8 +78,20 @@ test('zone overrides', () => {
 });
 
 test('panel fields carried through', () => {
-  const c = normalizeConfig({ panels: [{ name: 'House', host: 'h', port: 6054, encryptionKey: 'KEY', code: '1234' }] }, fakeLog());
-  assert.deepEqual(c.panels[0], { name: 'House', host: 'h', mac: undefined, port: 6054, encryptionKey: 'KEY', code: '1234', zones: [] });
+  const key = Buffer.alloc(32, 1).toString('base64');
+  const c = normalizeConfig({ panels: [{ name: 'House', host: 'h', port: 6054, encryptionKey: key, code: '1234' }] }, fakeLog());
+  assert.deepEqual(c.panels[0], { name: 'House', host: 'h', mac: undefined, port: 6054, encryptionKey: key, code: '1234', zones: [] });
+});
+
+test('panel with an invalid encryption key is dropped, never downgraded to plaintext', () => {
+  const log = fakeLog();
+  const c = normalizeConfig({ panels: [{ name: 'Bad', host: 'h', encryptionKey: 'dG9vc2hvcnQ=' }] }, log);
+  assert.equal(c.panels.length, 0);
+  assert.equal(log.messages.length, 1);
+  assert.match(log.messages[0], /Bad/);
+  assert.ok(!log.messages[0].includes('dG9vc2hvcnQ='));
+  const ok = normalizeConfig({ panels: [{ host: 'h', encryptionKey: Buffer.alloc(32, 7).toString('base64') }] }, fakeLog());
+  assert.equal(ok.panels.length, 1);
 });
 
 test('panelLabel prefers name, then host, then mac', () => {
