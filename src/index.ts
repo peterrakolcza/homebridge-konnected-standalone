@@ -1,3 +1,5 @@
+import './polyfills.ts';
+
 import type { API } from 'homebridge';
 
 import { KonnectedStandalonePlatform } from './platform.ts';

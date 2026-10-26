@@ -1,3 +1,5 @@
+import './polyfills.ts';
+
 import {
   AlarmControlPanelState, EncryptionKeyInvalidError, EncryptionKeyMissingError, EncryptionRequiredError, entityId, EspHomeClient, PermanentError,
 } from 'esphome-client';

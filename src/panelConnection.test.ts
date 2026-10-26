@@ -134,7 +134,13 @@ test('sendAlarmCommand rejects after timeout', async () => {
   const { mock, conn } = setup();
   await conn.start();
   mock.populateEntities(entities);
-  await assert.rejects(conn.sendAlarmCommand('house_alarm', AlarmControlPanelCommand.ARM_AWAY, undefined, () => false, 20));
+  // esphome-client's timeout timer is unref'd; on Node 22 nothing else would keep this test's event loop alive until it fires.
+  const keepAlive = setInterval(() => undefined, 1000);
+  try {
+    await assert.rejects(conn.sendAlarmCommand('house_alarm', AlarmControlPanelCommand.ARM_AWAY, undefined, () => false, 20));
+  } finally {
+    clearInterval(keepAlive);
+  }
 });
 
 test('reconnect clears fault and resyncs', async () => {

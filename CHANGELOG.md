@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 (2026-10-26)
+
+- Fix: on Node.js 22, arming/disarming and auto-reconnect failed because esphome-client uses `Promise.try`, which Node 22 lacks. The plugin now installs a spec-equivalent `Promise.try` when it is missing. Node 24 was not affected.
+- Docs: neutral example IP/MAC values in the settings placeholders and screenshots.
+- CI: the build workflow can also be run manually.
+
 ## 0.1.2 (2026-10-26)
 
 First public release on npm. Fixes found by an end-to-end test against a real panel:
