@@ -34,6 +34,8 @@ class FakeLink implements PanelLink {
 
 // HAPStatus.SERVICE_COMMUNICATION_FAILURE (ambient const enum, not importable under verbatimModuleSyntax).
 const COMM_FAILURE = -70402;
+// HAPStatus.INVALID_VALUE_IN_REQUEST
+const INVALID_VALUE = -70410;
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const timeoutError = () => new DOMException('timed out', 'TimeoutError');
@@ -86,6 +88,14 @@ test('code only sent when the panel requires it', async () => {
   assert.equal(link.calls[0].code, undefined);
   await target.handleSetRequest(HkTarget.DISARM);
   assert.equal(link.calls[1].code, '1111');
+});
+
+test('unsupported target is refused, not sent', async () => {
+  // HAP does not enforce validValues on writes; a panel without ARM_HOME must never receive arm home.
+  const { link, target } = setup({ entity: panelEntity({ supportedFeatures: AcpFeature.ARM_AWAY | AcpFeature.ARM_NIGHT }) });
+  await assert.rejects(() => target.handleSetRequest(HkTarget.STAY_ARM),
+    (e: unknown) => e === INVALID_VALUE || (e instanceof HapStatusError && e.hapStatus === INVALID_VALUE));
+  assert.equal(link.calls.length, 0);
 });
 
 test('offline set throws communication failure', async () => {

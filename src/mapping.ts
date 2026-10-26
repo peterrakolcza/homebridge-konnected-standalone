@@ -58,8 +58,15 @@ export function mapPanelState(state: AlarmControlPanelState, prev: MappedState, 
   case AlarmControlPanelState.ARMING:
     // The panel does not say which mode it is arming towards; fall back to Away when armed from outside HomeKit.
     return { current: prev.current, target: requested !== null && requested !== HkTarget.DISARM ? requested : HkTarget.AWAY_ARM };
-  case AlarmControlPanelState.PENDING:
-    return { ...prev };
+  case AlarmControlPanelState.PENDING: {
+    // The entry delay only runs while armed. If HomeKit still shows disarmed (the panel armed with no exit delay and a zone tripped
+    // at once), show the requested mode, or Away when unknown; never Off.
+    if (prev.current !== HkCurrent.DISARMED) {
+      return { ...prev };
+    }
+    const mode = requested !== null && requested !== HkTarget.DISARM ? requested : HkTarget.AWAY_ARM;
+    return { current: mode, target: mode };
+  }
   case AlarmControlPanelState.DISARMING:
     return { current: prev.current, target: HkTarget.DISARM };
   case AlarmControlPanelState.TRIGGERED:
@@ -107,18 +114,19 @@ export function validTargets(supportedFeatures: number): HkTarget[] {
 }
 
 /**
- * Whether a reported panel state settles a HomeKit request for `target`: the requested state itself, or ARMING towards an armed mode.
+ * Whether a reported panel state settles a HomeKit request for `target`: the requested state itself, or for arm requests ARMING
+ * (exit delay) or PENDING (armed with no exit delay and a zone already tripped).
  */
 export function confirmsRequest(target: HkTarget, state: AlarmControlPanelState): boolean {
   switch (target) {
   case HkTarget.DISARM:
     return state === AlarmControlPanelState.DISARMED;
   case HkTarget.STAY_ARM:
-    return state === AlarmControlPanelState.ARMED_HOME || state === AlarmControlPanelState.ARMING;
+    return state === AlarmControlPanelState.ARMED_HOME || state === AlarmControlPanelState.ARMING || state === AlarmControlPanelState.PENDING;
   case HkTarget.AWAY_ARM:
-    return state === AlarmControlPanelState.ARMED_AWAY || state === AlarmControlPanelState.ARMING;
+    return state === AlarmControlPanelState.ARMED_AWAY || state === AlarmControlPanelState.ARMING || state === AlarmControlPanelState.PENDING;
   case HkTarget.NIGHT_ARM:
-    return state === AlarmControlPanelState.ARMED_NIGHT || state === AlarmControlPanelState.ARMING;
+    return state === AlarmControlPanelState.ARMED_NIGHT || state === AlarmControlPanelState.ARMING || state === AlarmControlPanelState.PENDING;
   default: {
     const unreachable: never = target;
     return unreachable;

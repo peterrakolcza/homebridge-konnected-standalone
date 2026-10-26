@@ -13,6 +13,8 @@ export interface SecuritySystemOptions {
 
 // HAPStatus.SERVICE_COMMUNICATION_FAILURE. HAPStatus is a const enum, and reading it through `hap` crashes tsc 6.0.3's checker.
 const SERVICE_COMMUNICATION_FAILURE = -70402;
+// HAPStatus.INVALID_VALUE_IN_REQUEST
+const INVALID_VALUE_IN_REQUEST = -70410;
 
 const TARGET_LABEL: Record<HkTarget, string> = {
   [HkTarget.STAY_ARM]: 'arm home',
@@ -145,6 +147,11 @@ export class SecuritySystemHandler {
       throw new this.hap.HapStatusError(SERVICE_COMMUNICATION_FAILURE);
     }
     const target = value as HkTarget;
+    // HAP does not enforce validValues on writes, so a mode the panel does not support must be refused here.
+    if (!validTargets(this.entity.supportedFeatures ?? 0).includes(target)) {
+      this.log.warn(`${this.name}: the panel does not support ${TARGET_LABEL[target] ?? `target ${String(value)}`}; ignoring the request.`);
+      throw new this.hap.HapStatusError(INVALID_VALUE_IN_REQUEST);
+    }
     const seq = ++this.requestSeq;
     this.requested = target;
     const label = TARGET_LABEL[target];

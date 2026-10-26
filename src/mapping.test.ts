@@ -46,6 +46,13 @@ test('PENDING keeps armed state', () => {
   assert.deepEqual(mapPanelState(S.PENDING, armedAway, null), armedAway);
 });
 
+test('PENDING straight from disarmed shows armed, never Off', () => {
+  // Seen on a real panel: Night arms with no exit delay and an active zone starts the entry delay at once.
+  assert.deepEqual(mapPanelState(S.PENDING, disarmed, HkTarget.NIGHT_ARM), { current: HkCurrent.NIGHT_ARM, target: HkTarget.NIGHT_ARM });
+  assert.deepEqual(mapPanelState(S.PENDING, disarmed, null), { current: HkCurrent.AWAY_ARM, target: HkTarget.AWAY_ARM });
+  assert.deepEqual(mapPanelState(S.PENDING, disarmed, HkTarget.DISARM), { current: HkCurrent.AWAY_ARM, target: HkTarget.AWAY_ARM });
+});
+
 test('DISARMING targets DISARM and keeps current', () => {
   assert.deepEqual(mapPanelState(S.DISARMING, armedAway, null), { current: HkCurrent.AWAY_ARM, target: HkTarget.DISARM });
 });
@@ -76,4 +83,6 @@ test('confirmsRequest', () => {
   assert.equal(confirmsRequest(HkTarget.NIGHT_ARM, S.ARMED_NIGHT), true);
   assert.equal(confirmsRequest(HkTarget.DISARM, S.DISARMED), true);
   assert.equal(confirmsRequest(HkTarget.DISARM, S.ARMING), false);
+  assert.equal(confirmsRequest(HkTarget.NIGHT_ARM, S.PENDING), true);
+  assert.equal(confirmsRequest(HkTarget.DISARM, S.PENDING), false);
 });
