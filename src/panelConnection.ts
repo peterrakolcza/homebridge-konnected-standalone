@@ -1,5 +1,7 @@
-import { EncryptionKeyInvalidError, EncryptionKeyMissingError, EncryptionRequiredError, entityId, EspHomeClient, PermanentError } from 'esphome-client';
-import type { AlarmControlPanelCommand, AlarmControlPanelState, Entity, EspHomeLogging } from 'esphome-client';
+import {
+  AlarmControlPanelState, EncryptionKeyInvalidError, EncryptionKeyMissingError, EncryptionRequiredError, entityId, EspHomeClient, PermanentError,
+} from 'esphome-client';
+import type { AlarmControlPanelCommand, Entity, EspHomeLogging } from 'esphome-client';
 import type { Logging } from 'homebridge';
 
 import { normalizeMac, panelLabel } from './config.ts';
@@ -23,6 +25,13 @@ export interface PanelEvents {
 const defaultFactory: ClientFactory = opts => new EspHomeClient(opts);
 
 const RETRY_INITIAL_MS = 5_000;
+
+/**
+ * Protobuf omits zero-valued fields, and DISARMED is 0, so a disarmed panel sends no `state` at all.
+ */
+function alarmStateOf(event: { state?: AlarmControlPanelState }): AlarmControlPanelState {
+  return event.state ?? AlarmControlPanelState.DISARMED;
+}
 const RETRY_MAX_MS = 60_000;
 
 /**
@@ -90,9 +99,9 @@ export class PanelConnection implements PanelLink {
     }
     const options = code === undefined ? { command } : { command, code };
     return this.client.commandAndAwait(entityId('alarm_control_panel', objectId), options, {
-      predicate: event => event.state !== undefined && confirm(event.state),
+      predicate: event => confirm(alarmStateOf(event)),
       timeoutMs,
-    }).then(event => event.state as AlarmControlPanelState);
+    }).then(alarmStateOf);
   }
 
   private subscribe(): void {
@@ -109,8 +118,8 @@ export class PanelConnection implements PanelLink {
     });
     this.client.on('alarm_control_panel', event => {
       const objectId = this.objectIdByKey.get(event.key);
-      if (objectId !== undefined && event.state !== undefined) {
-        this.events.onAlarmState(objectId, event.state);
+      if (objectId !== undefined) {
+        this.events.onAlarmState(objectId, alarmStateOf(event));
       }
     });
     this.client.on('binary_sensor', event => {

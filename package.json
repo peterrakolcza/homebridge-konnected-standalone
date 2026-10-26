@@ -2,7 +2,7 @@
   "name": "homebridge-konnected-standalone",
   "displayName": "Konnected Standalone",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Unofficial Homebridge plugin for Konnected alarm panels running ESPHome standalone alarm mode. Native Apple Home alarm tile plus live zone sensors.",
   "author": "Peter Rakolcza",
   "license": "Apache-2.0",

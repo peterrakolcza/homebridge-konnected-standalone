@@ -86,6 +86,25 @@ test('alarm and binary sensor telemetry dispatched by entity key, not name', asy
   assert.deepEqual(calls.filter(c => c.kind === 'zone').map(c => c.args), [['zone_1', true, false], ['zone_1', false, true]]);
 });
 
+test('alarm state omitted on the wire means DISARMED', async () => {
+  // Protobuf omits zero values, and DISARMED is 0: a real panel sends no state field while disarmed.
+  const { mock, conn, calls } = setup();
+  await conn.start();
+  mock.emit('entities', entities);
+  mock.emit('alarm_control_panel', deviceState(ACP, 'House Alarm', {}));
+  assert.deepEqual(calls.filter(c => c.kind === 'alarm').map(c => c.args), [['house_alarm', S.DISARMED]]);
+});
+
+test('disarm is confirmed by a state event without a state field', async () => {
+  const { mock, conn } = setup();
+  await conn.start();
+  mock.populateEntities(entities);
+  const pending = conn.sendAlarmCommand('house_alarm', AlarmControlPanelCommand.DISARM, undefined, s => s === S.DISARMED, 1000);
+  await new Promise(resolve => setImmediate(resolve));
+  mock.emitState(mockStateMessage(ACP, {}));
+  assert.equal(await pending, S.DISARMED);
+});
+
 test('sendAlarmCommand uses commandAndAwait with code and predicate', async () => {
   const { mock, conn } = setup();
   await conn.start();

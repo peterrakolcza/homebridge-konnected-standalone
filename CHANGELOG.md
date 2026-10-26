@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- Fix: a disarmed panel sends no alarm `state` field (protobuf omits zero values), so DISARMED was never applied and disarm requests never confirmed. Found on a real Konnected ESP8266 panel running ESPHome 2026.9.1.
+
 ## 0.1.0
 
 - First release.
