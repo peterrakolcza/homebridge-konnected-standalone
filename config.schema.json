@@ -3,6 +3,8 @@
   "pluginType": "platform",
   "singular": true,
   "strictValidation": false,
+  "headerDisplay": "Unofficial plugin for Konnected panels running ESPHome **standalone alarm mode**. Not affiliated with Konnected Inc. or Homebridge.",
+  "footerDisplay": "Legacy Konnected 3.x firmware is not supported; use homebridge-konnected for that.",
   "schema": {
     "type": "object",
     "required": ["name"],
@@ -12,7 +14,129 @@
         "title": "Name",
         "type": "string",
         "default": "Konnected Standalone"
+      },
+      "panels": {
+        "title": "Panels",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string",
+              "description": "Optional. Defaults to the panel's ESPHome friendly name."
+            },
+            "host": {
+              "title": "Host or IP address",
+              "type": "string",
+              "description": "Either host or MAC address is required."
+            },
+            "mac": {
+              "title": "MAC address",
+              "type": "string",
+              "description": "Used to find the panel on the network when no host is given.",
+              "pattern": "^([0-9A-Fa-f]{2}[:-]?){5}[0-9A-Fa-f]{2}$"
+            },
+            "port": {
+              "title": "Port",
+              "type": "integer",
+              "default": 6053,
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "encryptionKey": {
+              "title": "API encryption key",
+              "type": "string",
+              "description": "The base64 key from the panel's ESPHome api: encryption: key setting. Required unless the panel has no encryption."
+            },
+            "code": {
+              "title": "Alarm code",
+              "type": "string",
+              "description": "Optional. Sent with arm/disarm commands when the panel requires a code."
+            },
+            "zones": {
+              "title": "Zone overrides",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id"],
+                "properties": {
+                  "id": {
+                    "title": "Zone name or object ID",
+                    "type": "string"
+                  },
+                  "type": {
+                    "title": "Show as",
+                    "type": "string",
+                    "default": "motion",
+                    "oneOf": [
+                      { "title": "Motion sensor", "enum": ["motion"] },
+                      { "title": "Contact sensor", "enum": ["contact"] }
+                    ]
+                  },
+                  "hidden": {
+                    "title": "Hide this zone",
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "commandTimeout": {
+        "title": "Command timeout (seconds)",
+        "type": "integer",
+        "default": 10,
+        "minimum": 2,
+        "description": "How long to wait for the panel to confirm an arm/disarm before Home reverts."
+      },
+      "discovery": {
+        "title": "Find panels on the network (mDNS)",
+        "type": "boolean",
+        "default": true
       }
     }
-  }
+  },
+  "layout": [
+    "name",
+    {
+      "key": "panels",
+      "type": "array",
+      "orderable": false,
+      "buttonText": "Add panel",
+      "items": [
+        {
+          "type": "fieldset",
+          "title": "Panel",
+          "expandable": true,
+          "expanded": true,
+          "items": [
+            "panels[].name",
+            "panels[].host",
+            "panels[].mac",
+            "panels[].port",
+            { "key": "panels[].encryptionKey", "type": "password" },
+            { "key": "panels[].code", "type": "password" },
+            {
+              "key": "panels[].zones",
+              "type": "array",
+              "buttonText": "Add zone override",
+              "items": ["panels[].zones[].id", "panels[].zones[].type", "panels[].zones[].hidden"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "fieldset",
+      "title": "Advanced",
+      "expandable": true,
+      "expanded": false,
+      "items": ["commandTimeout", "discovery"]
+    }
+  ]
 }
