@@ -3,7 +3,8 @@
     "target": "ES2022",
     "lib": [
       "DOM",
-      "ES2022"
+      "ES2022",
+      "ESNext.Disposable"
     ],
     "rootDir": "src",
     "module": "nodenext",
@@ -15,11 +16,13 @@
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "rewriteRelativeImportExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true
   },
   "include": [
-    "eslint.config.js",
-    "homebridge-ui",
     "src"
   ]
 }
